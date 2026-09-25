@@ -5,6 +5,7 @@ import type { Feature, FeatureCollection, GeoJsonObject, Geometry, GeometryColle
 import type { Topology } from 'topojson-specification'
 
 type Winding = 'rfc7946' | 'd3'
+type GeoDataOptions = Readonly<{ ids?: readonly string[] }>
 type Provenance = Readonly<{
   name: string
   version?: string
@@ -36,13 +37,31 @@ type PreparedSource = Readonly<{
   kind: GeoSource['kind']
 }>
 
-function geojson(data: GeoJsonObject, options: Omit<GeoJSONSource, 'kind' | 'data'> = {}): GeoJSONSource {
+function geojson(data: GeoJsonObject,
+  { ids, ...options }: Omit<GeoJSONSource, 'kind' | 'data'> & GeoDataOptions = {}): GeoJSONSource {
+  if (ids !== undefined) {
+    const collection: FeatureCollection<Geometry | null> = {
+      type: 'FeatureCollection', features: select_ids(as_features(data), ids, options.id_property),
+    }
+    data = collection
+  }
   return { kind: 'geojson', data, ...options }
 }
 
 function topojson(data: Topology, object: string,
-  options: Omit<TopoJSONSource, 'kind' | 'data' | 'object'> = {}): TopoJSONSource {
+  { ids, ...options }: Omit<TopoJSONSource, 'kind' | 'data' | 'object'> & GeoDataOptions = {}): TopoJSONSource {
   if (!object) throw new TypeError('A TopoJSON object name is required')
+  if (ids !== undefined) {
+    const geometry = Object.hasOwn(data.objects, object) ? data.objects[object] : undefined
+    if (!geometry) throw new Error(`TopoJSON object ${JSON.stringify(object)} was not found`)
+    const geometries = geometry.type === 'GeometryCollection' ? geometry.geometries : [geometry]
+    // Keep the shared arc table intact; meshes will be built from selected
+    // geometries only. Drop the old overall bbox rather than retain stale bounds.
+    const { bbox: _bbox, ...rest } = data
+    data = { ...rest, objects: { ...data.objects, [object]: {
+      type: 'GeometryCollection', geometries: select_ids(geometries, ids, options.id_property),
+    } } }
+  }
   return { kind: 'topojson', data, object, ...options }
 }
 
@@ -84,14 +103,31 @@ function as_features(object: GeoJsonObject): GeoFeature[] {
   return [{ type: 'Feature', properties: {}, geometry: object as Geometry }]
 }
 
-function identify(item: GeoFeature, index: number, id_property?: string): NamedFeature {
+type IdentifiedGeometry = { id?: string | number; properties?: Record<string, unknown> | null }
+
+function source_id(item: IdentifiedGeometry, index: number, id_property?: string) {
   const value = id_property && item.properties && Object.hasOwn(item.properties, id_property)
     ? item.properties[id_property] : id_property ? undefined : item.id
   if (value !== undefined && value !== null && typeof value !== 'string' && typeof value !== 'number') {
     throw new TypeError(`Feature ${index} has a non-string/non-number ID`)
   }
   const explicit_id = value !== undefined && value !== null
-  return { id: String(explicit_id ? value : index), feature: item, explicit_id }
+  return { id: String(explicit_id ? value : index), explicit_id }
+}
+
+function select_ids<T extends IdentifiedGeometry>(items: readonly T[], ids: readonly string[], id_property?: string): T[] {
+  if (!Array.isArray(ids) || ids.some(id => typeof id !== 'string')) {
+    throw new TypeError('Source ids must be an array of strings')
+  }
+  const selected = new Set(ids), missing = new Set(ids)
+  const result = items.filter((item, index) => {
+    const { id, explicit_id } = source_id(item, index, id_property)
+    if (!explicit_id || !selected.has(id)) return false
+    missing.delete(id)
+    return true
+  })
+  if (missing.size) throw new Error(`Source feature ${JSON.stringify(missing.values().next().value)} was not found`)
+  return result
 }
 
 function prepare_geo_source(source: GeoSource): PreparedSource {
@@ -116,7 +152,7 @@ function prepare_geo_source(source: GeoSource): PreparedSource {
   } else {
     throw new TypeError('Expected a GeoJSON or TopoJSON source')
   }
-  const features = items.map((item, index) => identify(item, index, source.id_property))
+  const features = items.map((item, index) => ({ ...source_id(item, index, source.id_property), feature: item }))
   const by_id = new Map<string, NamedFeature>()
   for (const named of features) {
     if (by_id.has(named.id)) throw new Error(`Duplicate feature ID ${JSON.stringify(named.id)}`)
@@ -126,4 +162,4 @@ function prepare_geo_source(source: GeoSource): PreparedSource {
 }
 
 export { geojson, topojson, prepare_geo_source }
-export type { Winding, Provenance, GeoJSONSource, TopoJSONSource, GeoSource, NamedFeature, PreparedSource }
+export type { Winding, Provenance, GeoDataOptions, GeoJSONSource, TopoJSONSource, GeoSource, NamedFeature, PreparedSource }

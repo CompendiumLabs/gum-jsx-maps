@@ -5,6 +5,10 @@ These files ship with `@gum-jsx/maps`. The synchronous `world_countries()` and
 or network access. Each call copies the data and includes its source URL, version,
 and boundary viewpoint in `provenance`.
 
+Both accessors accept `{ ids: [...] }` to return only selected features, preserving
+source order and shared TopoJSON arcs. Use exact string IDs (including leading
+zeros); unknown IDs are errors. Omit the option for the full atlas.
+
 The atlas downloads are kept byte-for-byte as published. `world_countries()`
 fills three missing country IDs in its returned copy so every feature supports
 ID-keyed feature styles:

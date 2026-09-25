@@ -14,12 +14,19 @@ or network access:
 
 | Accessor | Source | Feature IDs |
 | --- | --- | --- |
-| `world_countries()` | world-atlas 2.0.2, 1:110m countries | Three-digit country IDs, plus three stable local IDs |
-| `us_states()` | us-atlas 3.0.1, 1:10m states and territories | Two-digit state FIPS IDs |
+| `world_countries(options?)` | world-atlas 2.0.2, 1:110m countries | Three-digit country IDs, plus three stable local IDs |
+| `us_states(options?)` | us-atlas 3.0.1, 1:10m states and territories | Two-digit state FIPS IDs |
 
 Each call returns a fresh `TopoJSONSource` with its version and source URL in
 `provenance`. You can inspect or modify its `data` without affecting later calls.
 See [bundled data](data/README.md) for the original files, licenses, and local IDs.
+
+Pass `{ ids: ['276', '040'] }` to `world_countries` to select Germany and Austria,
+or `{ ids: ['06', '32'] }` to `us_states` for California and Nevada. IDs are exact
+strings, including leading zeros. Unknown IDs are errors; repeated IDs select a
+feature once and source order is retained. Omit `ids` for everything, or use
+`ids: []` for no features. Filtering preserves shared TopoJSON arcs and rebuilds
+borders from the selected geometries. `GeoDataOptions` describes this option.
 
 ```ts
 import { render_element, px } from '@gum-jsx/core'
@@ -76,6 +83,11 @@ D3's spherical pipeline. Use `{ winding: 'd3' }` only for GeoJSON that already
 uses D3/TopoJSON's convention. `topojson(data, objectName)` reads a named
 Topology object and retains its shared arcs for one-pass borders.
 
+Both constructors accept `ids` too: `geojson(data, { ids: ['A', 'B'] })` or
+`topojson(data, 'regions', { ids: ['A', 'B'] })`. Filtering honors `id_property`
+and does not mutate the input. Numeric source IDs are matched as strings;
+features without explicit IDs cannot be selected by generated positional IDs.
+
 Use the IDs present in your own source. The example key `840` is the numeric
 ISO country ID used by some world TopoJSON files. Style dictionaries reject unknown
 IDs, and all features must have explicit IDs when feature styles are used. For GeoJSON whose
@@ -120,6 +132,30 @@ Set `fit_to: 'data'` for a regional map or
 `fit_to: { ids: ['feature-id'] }` for a stable selected extent. The fit target
 does not depend on feature styles.
 
+Use `fit_to: { bounds: [west, south, east, north] }` to fit a coordinate box in
+longitude/latitude degrees, independently of source features. Bounds fit a
+sampled geographic rectangle under the chosen projection. They frame the view;
+they do not filter features or crop geometry to the geographic box.
+
+Combine source selection and bounds fitting:
+
+```jsx
+<GeoMap
+  source={world_countries({ ids: ['276', '040'] })}
+  fit-to={{ bounds: [5, 45, 18, 56] }}
+  background={lightgray}
+/>
+```
+
+Longitudes must be in `[-180, 180]`, latitude limits in `[-90, 90]` with south
+less than north, and longitude span must be positive. West greater than east
+crosses the antimeridian; `[170, -20, -170, 20]` with `rotate={[-180, 0, 0]}`
+gives a continuous Pacific view. Bounds preserve the chosen rotation and clipping,
+and fit only their visible portion. A target with no visible extent is an error.
+Use `[-180, south, 180, north]` for a full longitude span. The exported `GeoBounds`
+type names the four components. Choose either `ids` or `bounds` inside `fit_to`.
+An empty selection can still use sphere or bounds fitting, but cannot fit to data.
+
 Set `center: [longitude, latitude]` to pan that geographic point to the viewport
 midpoint after fitting. The fit target still determines the scale; panning can
 move some fitted geometry outside the viewport. Omit `center` to keep the fit
@@ -136,7 +172,26 @@ The map has a natural 720 px width and 1.8 aspect ratio. Explicit `width` and
 `height` use ordinary Gum sizing. `map_padding`, `border_width`, and
 `point_radius` use Gum lengths; `px()` makes the intended unit unambiguous.
 
-For a point annotation, `project_geo_point(source, view, width, height,
+Nest core marks and annotations inside `GeoMap`. Numeric pairs are
+`[longitude, latitude]` in degrees; direct-child `x` and `y` anchors share the
+map's projection. `Points`, sampled `Arrow` routes, and labels follow its fit,
+center, rotation, padding, and resizing. Hidden points are omitted and sampled
+paths break at them. Child marker sizes, arrowheads, and text remain layout
+lengths. Set route strokes explicitly, since children inherit map styles.
+
+```jsx
+<GeoMap source={world_countries()} background="lightblue">
+  <Points points={[[2.35, 48.86]]} point-size={px(8)} fill="red" />
+  <Text x={2.35} y={48.86} anchor={['start', 'end']}>Paris</Text>
+</GeoMap>
+```
+
+Core projections map only supplied point pairs; they do not resample paths or
+split antimeridian crossings. Supply sampled routes and separate marks at seams
+as needed. `space="local"` opts marks out; tagged x/y lengths position annotations
+in local space. The geographic source retains its spherical path rendering.
+
+For a point annotation outside the map subtree, `project_geo_point(source, view, width, height,
 [longitude, latitude])` returns local pixel coordinates or `null` if clipped.
 Pass the same projection, fit target, and padding to this helper as to `GeoMap`.
 The helper's `map_padding` value is a number of **pixels** because it does not

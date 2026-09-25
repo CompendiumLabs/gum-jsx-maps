@@ -1,10 +1,11 @@
 import {
-  Element, available, draw_path, make_fragment, make_measure, make_rect, make_request, px,
+  Element, Projection, available, draw_path, element_children, graph_children,
+  make_fragment, make_measure, make_rect, make_request, px,
   resolve_length, resolve_paint, resolve_style, shape_size, theme_color,
 } from '@gum-jsx/core'
 import type { ElementProps, LayoutQuery, Length, Size, StyleSpec } from '@gum-jsx/core'
 import { projected_commands } from './path'
-import { create_geo_projection } from './projection'
+import { create_geo_projection, project_fitted_point } from './projection'
 import type { GeoView } from './projection'
 import { prepare_geo_source } from './source'
 import type { GeoSource, PreparedSource } from './source'
@@ -85,6 +86,7 @@ function map_source(props: GeoMapData, query: LayoutQuery): PreparedSource {
 
 class GeoMap extends Element<GeoMapData, GeoMapProps> {
   static normalize = map_data
+  static data_bounds() { return null; }
   static defaults = {
     fill: '#dce5e8',
     stroke: 'none',
@@ -168,7 +170,11 @@ class GeoMap extends Element<GeoMapData, GeoMapProps> {
       }
     }
     const area = make_rect(0, 0, size.width, size.height)
-    return make_fragment({ size, draw, content: area, clip: area,
+    const children = graph_children(element_children(props.children), query, size, {
+      xlim: [0, size.width], ylim: [0, size.height], flip_x: false, flip_y: false,
+      projection: new Projection(point => project_fitted_point(projection, point)),
+    })
+    return make_fragment({ size, draw, children, content: area, clip: area,
       ...(props.aria_label ? { label: props.aria_label } : {}) })
   }
 }
