@@ -1,5 +1,5 @@
 export { GeoMap } from './map'
-export type { GeoMapProps, BorderMode } from './map'
+export type { GeoMapProps, BorderMode, GeoStyle, GeoStyleMap, GeoStyles } from './map'
 export { geojson, topojson, prepare_geo_source } from './source'
 export type { GeoSource, GeoJSONSource, TopoJSONSource, PreparedSource, Provenance, Winding } from './source'
 export { world_countries, us_states } from './data'

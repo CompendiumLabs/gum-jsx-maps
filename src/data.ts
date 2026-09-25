@@ -5,7 +5,7 @@ import { topojson } from './source'
 import type { TopoJSONSource } from './source'
 
 // Preserve the upstream atlas bytes while filling its three missing country IDs
-// with stable local values, so every country can participate in fill_by_id joins.
+// with stable local values, so every country can receive an ID-keyed style.
 const localWorldIds: Record<string, string> = {
   'N. Cyprus': 'local:northern-cyprus',
   Somaliland: 'local:somaliland',

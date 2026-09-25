@@ -13,6 +13,7 @@ type GeoView = Readonly<{
   projection?: ProjectionName
   fit_to?: FitTarget
   map_padding?: number // pixels in this helper; GeoMap also accepts Gum lengths
+  /** Geographic location to pan to the viewport midpoint after fitting the scale. */
   center?: readonly [longitude: number, latitude: number]
   rotate?: readonly [lambda: number, phi: number, gamma?: number]
   clip_angle?: number | null
@@ -59,7 +60,7 @@ function create_geo_projection(source: PreparedSource, view: GeoView, width: num
   if (padding < 0 || padding * 2 >= Math.min(width, height)) {
     throw new RangeError('Map padding must leave a positive drawing area')
   }
-  const name = view.projection ?? 'equalEarth'
+  const name = view.projection ?? 'naturalEarth1'
   const projection = projection_preset(name)
   if (name === 'albersUsa' && (view.center || view.rotate || view.clip_angle !== undefined)) {
     throw new TypeError('albersUsa has fixed center, rotation, and spherical clipping')
@@ -87,6 +88,14 @@ function create_geo_projection(source: PreparedSource, view: GeoView, width: num
     throw new TypeError('albersUsa cannot fit the whole sphere; use data or selected IDs')
   }
   projection.fitExtent([[padding, padding], [width - padding, height - padding]], fit_object(source, target))
+  if (view.center) {
+    // fitExtent replaces translation, canceling D3's center offset. Pan after
+    // fitting so the requested geographic point stays centered, even with rotation.
+    const point = projection([view.center[0], view.center[1]])
+    if (!point || !point.every(Number.isFinite)) throw new RangeError('Map center must project to a finite point')
+    const [x, y] = projection.translate()
+    projection.translate([x + width / 2 - point[0], y + height / 2 - point[1]])
+  }
   return projection
 }
 

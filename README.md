@@ -31,10 +31,10 @@ const result = render_element(new GeoMap({
   source: world,
   width: px(900),
   height: px(500),
-  projection: 'equalEarth',
   fit_to: 'sphere',
   map_padding: px(12),
-  fill_by_id: { '840': '#4079ad' },
+  background: '#dceef7',
+  styles: { '840': { fill: '#4079ad' } },
   border_color: '#ffffff',
   border_width: px(0.7),
   aria_label: 'World map',
@@ -51,7 +51,8 @@ For example, save this as `world.jsx`:
   source={world_countries()}
   width={px(900)}
   height={px(500)}
-  fill-by-id={{ '840': '#4079ad' }}
+  background={interp(white, blue, 0.15)}
+  styles={id => id === '840' ? { fill: blue } : undefined}
 />
 ```
 
@@ -65,7 +66,7 @@ Gum `.jsx` files use the plugin's exports directly, without package imports.
 For an embedded evaluator, import the package with
 `import * as maps from '@gum-jsx/maps'`, then construct
 `new Evaluator({ scope: maps })`. In JSX, write dashed property names such as
-`fill-by-id`, `fit-to`, and `map-padding`.
+`fit-to`, `map-padding`, and `border-color`.
 
 ## Your own source
 
@@ -76,18 +77,39 @@ uses D3/TopoJSON's convention. `topojson(data, objectName)` reads a named
 Topology object and retains its shared arcs for one-pass borders.
 
 Use the IDs present in your own source. The example key `840` is the numeric
-ISO country ID used by some world TopoJSON files. `fill_by_id` rejects unknown
-IDs, and all features must have explicit IDs when it is used. For GeoJSON whose
+ISO country ID used by some world TopoJSON files. Style dictionaries reject unknown
+IDs, and all features must have explicit IDs when feature styles are used. For GeoJSON whose
 IDs live in properties, set `id_property`, for example
 `geojson(data, { id_property: 'ADM0_A3' })`. Name matching is left to the data
 preparation step.
+
+## Feature styles
+
+`styles` accepts either `(id: string) => GeoStyle | undefined` or an ID-to-style
+dictionary. For example, use `styles: id => ({ fill: colors[id] })`, or
+`styles: { '840': { fill: '#4079ad', stroke: '#263238', stroke_width: px(2) } }`.
+Missing entries, undefined callback results, and omitted fields inherit the map's
+style. The exported `GeoStyle`, `GeoStyleMap`, and `GeoStyles` types describe
+these forms.
+
+Styles support Gum paint properties, including `fill`, `opacity`, `stroke`,
+`stroke_width`, `stroke_dasharray`, caps and joins, plus `point_radius` for point
+features. Theme colors and px/em/fractional lengths resolve during layout.
+Feature strokes are drawn after the shared borders. Shared borders keep their
+map-wide paint; set `border_mode: 'none'` to draw only feature outlines, whose
+adjacent edges can overlap.
+
+Callbacks are evaluated once per feature when constructing a map with `source`;
+their results are snapshotted and are not reevaluated during resizing. With
+`source_resource`, use a style dictionary so the element remains an immutable
+description independent of a particular layout pass.
 
 ## Projection and layout
 
 | Preset | Good starting point |
 | --- | --- |
-| `equalEarth` (default) | World thematic maps with comparable areas |
-| `naturalEarth1` | General world illustrations |
+| `naturalEarth1` (default) | General world illustrations |
+| `equalEarth` | World thematic maps with comparable areas |
 | `albersUsa` | United States with Alaska and Hawaii insets |
 | `orthographic` | Globe views |
 | `equirectangular` | Simple rectangular world views |
@@ -96,10 +118,19 @@ preparation step.
 The default fit target is `sphere`, except for `albersUsa`, which fits `data`.
 Set `fit_to: 'data'` for a regional map or
 `fit_to: { ids: ['feature-id'] }` for a stable selected extent. The fit target
-does not depend on `fill_by_id`. Optional `center`, `rotate`, `clip_angle`, and
-`precision` follow D3's degree/pixel conventions. `albersUsa` has fixed center,
-rotation, and clipping; it excludes US territories beyond the lower 48 states,
-Alaska, and Hawaii.
+does not depend on feature styles.
+
+Set `center: [longitude, latitude]` to pan that geographic point to the viewport
+midpoint after fitting. The fit target still determines the scale; panning can
+move some fitted geometry outside the viewport. Omit `center` to keep the fit
+target centered automatically. `center` does not turn the globe or change which
+hemisphere is visible. Use `rotate: [-longitude, -latitude, 0]` to face a location
+on an orthographic globe. When both are supplied, `center` still refers to the
+original geographic coordinates.
+
+`rotate`, `clip_angle`, and `precision` follow D3's degree/pixel conventions.
+`albersUsa` has fixed center, rotation, and clipping; it excludes US territories
+beyond the lower 48 states, Alaska, and Hawaii.
 
 The map has a natural 720 px width and 1.8 aspect ratio. Explicit `width` and
 `height` use ordinary Gum sizing. `map_padding`, `border_width`, and
@@ -112,6 +143,16 @@ The helper's `map_padding` value is a number of **pixels** because it does not
 run within Gum layout.
 
 ## Borders and large sources
+
+`background` fills the projected sphere behind the features, providing a water
+color while leaving the area outside the projection transparent. It defaults to
+`none` and accepts the same color strings and theme paints as other backgrounds.
+The fill follows the map's projection, rotation, clipping, and fitted extent;
+it forms a circle for an orthographic globe. For regional maps, the sphere is
+cropped to the map rectangle. Albers USA uses its composite projection's clip
+regions. This fills gaps and polygon holes in the supplied geography, so lakes
+appear only where the source leaves them unfilled. Use an outer `Box` background
+to give the surrounding rectangle a separate color.
 
 `border_mode` accepts `all` (default), `interior`, or `none`. With TopoJSON,
 the chosen borders are drawn once from a shared-arc mesh. GeoJSON can draw all

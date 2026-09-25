@@ -7,7 +7,7 @@ and boundary viewpoint in `provenance`.
 
 The atlas downloads are kept byte-for-byte as published. `world_countries()`
 fills three missing country IDs in its returned copy so every feature supports
-`fill_by_id`:
+ID-keyed feature styles:
 
 | Feature name | Local ID |
 | --- | --- |
