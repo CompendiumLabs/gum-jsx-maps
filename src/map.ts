@@ -1,11 +1,11 @@
 import {
-  Element, Projection, available, draw_path, element_children, graph_children,
-  make_fragment, make_measure, make_rect, make_request, px,
+  Element, Projection, available, deflate_request, draw_path, element_children, finish_size, graph_children,
+  make_fragment, make_insets, make_measure, make_rect, make_request, make_size, normalize_length, px,
   resolve_length, resolve_paint, resolve_style, shape_size, theme_color,
 } from '@gum-jsx/core'
-import type { ElementProps, LayoutQuery, Length, Size, StyleSpec } from '@gum-jsx/core'
+import type { AxisSizing, ElementProps, LayoutQuery, Length, Size, StyleSpec } from '@gum-jsx/core'
 import { projected_commands } from './path'
-import { create_geo_projection, project_fitted_point } from './projection'
+import { bounds_object, create_geo_projection, geo_aspect, project_fitted_point } from './projection'
 import type { GeoView } from './projection'
 import { prepare_geo_source } from './source'
 import type { GeoSource, PreparedSource } from './source'
@@ -14,11 +14,11 @@ type BorderMode = 'all' | 'interior' | 'none'
 type GeoStyle = StyleSpec & Readonly<{ point_radius?: Length }>
 type GeoStyleMap = Readonly<Record<string, GeoStyle | undefined>>
 type GeoStyles = GeoStyleMap | ((id: string) => GeoStyle | undefined)
-type GeoMapProps = ElementProps & Omit<GeoView, 'map_padding'> & Readonly<{
+type GeoMapProps = ElementProps & Omit<GeoView, 'padding'> & Readonly<{
   source?: GeoSource
   /** A GeoSource or PreparedSource installed on the LayoutPass. */
   source_resource?: string
-  map_padding?: Length
+  padding?: Length
   /** Fill the projected sphere behind the features, leaving its exterior transparent. */
   background?: string
   styles?: GeoStyles
@@ -26,7 +26,6 @@ type GeoMapProps = ElementProps & Omit<GeoView, 'map_padding'> & Readonly<{
   border_color?: string
   border_width?: Length
   point_radius?: Length
-  aria_label?: string
 }>
 type GeoMapData = Omit<GeoMapProps, 'styles'> & Readonly<{ styles?: GeoStyleMap }>
 
@@ -66,12 +65,38 @@ function map_data({ styles, ...props }: GeoMapProps): GeoMapData {
   return { ...props, styles }
 }
 
-function map_size(query: LayoutQuery): Size {
+function map_size(props: GeoMapData, source: PreparedSource, query: LayoutQuery): Size {
   const { width, height } = query.request
   const request = width.kind === 'natural' && height.kind === 'natural'
-    ? make_request({ width: available(720) }) : query.request
-  const aspect = query.sizing.aspect ?? (width.kind === 'natural' || height.kind === 'natural' ? 1.8 : undefined)
-  return shape_size(request, { ...query.sizing, aspect })
+    ? make_request({ width: available(720), height: available(400) }) : query.request
+  // User aspect describes the outer allocation. Two exact axes also take
+  // precedence; otherwise the projected fit target supplies the natural ratio.
+  if (query.sizing.aspect !== undefined || (width.kind === 'exact' && height.kind === 'exact')) {
+    return shape_size(request, query.sizing)
+  }
+  const aspect = query.prepare('geo-aspect', () => geo_aspect(source, props))
+  const padding = normalize_length(props.padding ?? 0, 'padding')
+  if (padding.value < 0 || (padding.unit === 'fraction' && padding.value >= 0.5)) {
+    throw new RangeError('Map padding must leave a positive drawing area')
+  }
+  if (padding.unit === 'fraction') {
+    // Fractional padding uses the shorter outer axis. Solve for the outer
+    // ratio directly so percentages do not need iterative measurement.
+    const inset = 2 * padding.value
+    const outer_aspect = aspect >= 1 ? aspect * (1 - inset) + inset
+      : aspect / (1 - inset + aspect * inset)
+    return shape_size(request, { ...query.sizing, aspect: outer_aspect })
+  }
+  const inset = resolve_length(padding, query.measure, undefined, 'padding')
+  const subtract = (value: number) => Math.max(0, value - 2 * inset)
+  const inner_axis = (axis: AxisSizing): AxisSizing => ({ ...axis,
+    preferred: axis.preferred === undefined ? undefined : subtract(axis.preferred),
+    min: subtract(axis.min), max: subtract(axis.max),
+  })
+  const inner = shape_size(deflate_request(request, make_insets({
+    left: inset, right: inset, top: inset, bottom: inset,
+  })), { width: inner_axis(query.sizing.width), height: inner_axis(query.sizing.height), aspect })
+  return finish_size(make_size(inner.width + 2 * inset, inner.height + 2 * inset), query.request, query.sizing)
 }
 
 function map_source(props: GeoMapData, query: LayoutQuery): PreparedSource {
@@ -97,14 +122,14 @@ class GeoMap extends Element<GeoMapData, GeoMapProps> {
   }
 
   static layout(props: GeoMapData, query: LayoutQuery) {
-    const size = map_size(query)
     const source = map_source(props, query)
+    const size = map_size(props, source, query)
     const shortest = Math.min(size.width, size.height)
-    const padding = resolve_length(props.map_padding ?? px(8), query.measure, shortest, 'map_padding')
+    const padding = resolve_length(props.padding ?? 0, query.measure, shortest, 'padding')
     const border_width = resolve_length(props.border_width ?? px(0.7), query.measure, shortest, 'border_width')
     const point_radius = resolve_length(props.point_radius ?? px(3), query.measure, shortest, 'point_radius')
     if (border_width < 0 || point_radius < 0) throw new RangeError('Map line and point widths must be nonnegative')
-    const projection = create_geo_projection(source, { ...props, map_padding: padding }, size.width, size.height)
+    const projection = create_geo_projection(source, { ...props, padding }, size.width, size.height)
     const paint = resolve_paint(query.style, size, query.measure)
     const styles = new Map(Object.entries(props.styles ?? {}))
     if (styles.size) {
@@ -170,12 +195,16 @@ class GeoMap extends Element<GeoMapData, GeoMapProps> {
       }
     }
     const area = make_rect(0, 0, size.width, size.height)
+    // Clip after projection so complete paths can cross the bounds, and the
+    // water, geography, and ordinary child elements all share the same edge.
+    const bounds = props.bounds
+    const clip_path = bounds === undefined ? undefined : projected_commands(projection, bounds_object(bounds))
     const children = graph_children(element_children(props.children), query, size, {
       xlim: [0, size.width], ylim: [0, size.height], flip_x: false, flip_y: false,
       projection: new Projection(point => project_fitted_point(projection, point)),
     })
     return make_fragment({ size, draw, children, content: area, clip: area,
-      ...(props.aria_label ? { label: props.aria_label } : {}) })
+      ...(clip_path === undefined ? {} : { clip_path }) })
   }
 }
 

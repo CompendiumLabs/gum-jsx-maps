@@ -88,9 +88,9 @@ test('TopoJSON filters honor property IDs, single objects, and input ownership',
 test('GeoMap draws and styles only selected features while bounds control the frame', () => {
   const source = world_countries({ ids: ['276', '040'] })
   const calls: string[] = []
-  const map = new GeoMap({ source, width: px(500), height: px(300), fit_to: { bounds: [5, 45, 18, 56] },
+  const map = new GeoMap({ source, width: px(500), height: px(300), bounds: [5, 45, 18, 56],
     border_mode: 'none', styles: id => { calls.push(id); return { fill: 'green' }; } })
   expect(new Set(calls)).toEqual(new Set(['276', '040']))
   expect(new LayoutPass().layout(map).draw).toHaveLength(2)
-  expect(() => new LayoutPass().layout(new GeoMap({ source, fit_to: { ids: ['250'] } }))).toThrow('was not found')
+  expect(() => new LayoutPass().layout(new GeoMap({ source, fit_to: ['250'] }))).toThrow('was not found')
 })

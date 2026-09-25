@@ -114,7 +114,7 @@ describe('projected backgrounds', () => {
   test('draws a padded circular globe behind feature fills and borders', () => {
     const map = new LayoutPass().layout(new GeoMap({
       source: geojson(countries), width: px(400), height: px(240),
-      projection: 'orthographic', rotate: [-10, -5], map_padding: px(16),
+      projection: 'orthographic', rotate: [-10, -5], padding: px(16),
       background: 'blue', fill: 'green', border_color: 'white',
     }))
     const [background, ...features] = map.draw
@@ -173,7 +173,7 @@ describe('projected backgrounds', () => {
 
   test('keeps regional fitting and viewport clipping when the sphere exceeds the map', () => {
     const pass = new LayoutPass()
-    for (const fit_to of ['data', { ids: ['west'] }] as const) {
+    for (const fit_to of ['data', ['west']] as const) {
       const props = { source: geojson(countries), width: px(400), height: px(240), fit_to }
       const plain = pass.layout(new GeoMap(props))
       const filled = pass.layout(new GeoMap({ ...props, background: 'blue' }))
@@ -211,7 +211,7 @@ describe('projection and Gum integration', () => {
   test('fits selected geography and clips points behind an orthographic globe', () => {
     const prepared = prepare_geo_source(geojson(countries))
     const all = create_geo_projection(prepared, { fit_to: 'data' }, 200, 400)
-    const west = create_geo_projection(prepared, { fit_to: { ids: ['west'] } }, 200, 400)
+    const west = create_geo_projection(prepared, { fit_to: ['west'] }, 200, 400)
     expect(west.scale()).toBeGreaterThan(all.scale())
     const globe = { projection: 'orthographic' as const, center: [0, 0] as const, fit_to: 'sphere' as const }
     expect(project_geo_point(prepared, globe, 400, 240, [0, 0])).not.toBeNull()
@@ -221,12 +221,11 @@ describe('projection and Gum integration', () => {
   test('uses a pass resource and renders at the allocated size', () => {
     const pass = new LayoutPass({ world: { value: prepare_geo_source(geojson(countries)), version: 1 } })
     const map = new GeoMap({ source_resource: 'world', width: px(320), height: px(180),
-      fit_to: 'data', aria_label: 'Two regions' })
+      fit_to: 'data' })
     const result = render_element(new Svg({ width: px(320), height: px(180), children: map }), { pass })
     expect(result.kind).toBe('svg')
     if (result.kind !== 'svg') return
     expect(result.size).toEqual({ width: 320, height: 180 })
-    expect(result.svg).toContain('aria-label="Two regions"')
     expect(result.svg).not.toContain('NaN')
   })
 

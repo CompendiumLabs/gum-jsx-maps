@@ -14,9 +14,9 @@ const prepared = prepare_geo_source(source)
 
 for (const projection of ['naturalEarth1', 'equalEarth', 'orthographic', 'equirectangular', 'mercator'] as const) {
   test(`${projection} centers the requested location after fitting`, () => {
-    for (const fit_to of ['sphere', 'data', { ids: ['region'] }] as const) {
+    for (const fit_to of ['sphere', 'data', ['region']] as const) {
       for (const [width, height] of [[640, 400], [300, 500]]) {
-        const view = { projection, fit_to, map_padding: 20 }
+        const view = { projection, fit_to, padding: 20 }
         const fitted = create_geo_projection(prepared, view, width, height)
         const centered = create_geo_projection(prepared, { ...view, center: [30, 20] }, width, height)
         const point = centered([30, 20])!

@@ -39,12 +39,11 @@ const result = render_element(new GeoMap({
   width: px(900),
   height: px(500),
   fit_to: 'sphere',
-  map_padding: px(12),
+  padding: px(12),
   background: '#dceef7',
   styles: { '840': { fill: '#4079ad' } },
   border_color: '#ffffff',
   border_width: px(0.7),
-  aria_label: 'World map',
 }))
 
 if (result.kind === 'svg') await Bun.write('world.svg', result.svg)
@@ -73,7 +72,7 @@ Gum `.jsx` files use the plugin's exports directly, without package imports.
 For an embedded evaluator, import the package with
 `import * as maps from '@gum-jsx/maps'`, then construct
 `new Evaluator({ scope: maps })`. In JSX, write dashed property names such as
-`fit-to`, `map-padding`, and `border-color`.
+`fit-to` and `border-color`.
 
 ## Your own source
 
@@ -129,20 +128,22 @@ description independent of a particular layout pass.
 
 The default fit target is `sphere`, except for `albersUsa`, which fits `data`.
 Set `fit_to: 'data'` for a regional map or
-`fit_to: { ids: ['feature-id'] }` for a stable selected extent. The fit target
+`fit_to: ['feature-id']` for a stable selected extent. The fit target
 does not depend on feature styles.
 
-Use `fit_to: { bounds: [west, south, east, north] }` to fit a coordinate box in
+Use `bounds: [west, south, east, north]` to fit a coordinate box in
 longitude/latitude degrees, independently of source features. Bounds fit a
-sampled geographic rectangle under the chosen projection. They frame the view;
-they do not filter features or crop geometry to the geographic box.
+sampled geographic rectangle under the chosen projection and clip the map to its
+projected outline, including water, borders, and child elements. Fitting preserves
+proportions: a narrow region in a wide allocation leaves transparent space beside
+it. Source features remain intact; clipping only limits the rendered view.
 
 Combine source selection and bounds fitting:
 
 ```jsx
 <GeoMap
   source={world_countries({ ids: ['276', '040'] })}
-  fit-to={{ bounds: [5, 45, 18, 56] }}
+  bounds={[5, 45, 18, 56]}
   background={lightgray}
 />
 ```
@@ -153,7 +154,9 @@ crosses the antimeridian; `[170, -20, -170, 20]` with `rotate={[-180, 0, 0]}`
 gives a continuous Pacific view. Bounds preserve the chosen rotation and clipping,
 and fit only their visible portion. A target with no visible extent is an error.
 Use `[-180, south, 180, north]` for a full longitude span. The exported `GeoBounds`
-type names the four components. Choose either `ids` or `bounds` inside `fit_to`.
+type names the four components. When supplied, `bounds` overrides `fit_to` for
+fitting, clipping, and natural sizing; the unused fit target is not looked up.
+Without bounds, `fit_to` accepts only `'sphere'`, `'data'`, or an array of IDs.
 An empty selection can still use sphere or bounds fitting, but cannot fit to data.
 
 Set `center: [longitude, latitude]` to pan that geographic point to the viewport
@@ -168,8 +171,13 @@ original geographic coordinates.
 `albersUsa` has fixed center, rotation, and clipping; it excludes US territories
 beyond the lower 48 states, Alaska, and Hawaii.
 
-The map has a natural 720 px width and 1.8 aspect ratio. Explicit `width` and
-`height` use ordinary Gum sizing. `map_padding`, `border_width`, and
+The map derives its natural proportions from the projected fit target, including
+rotation and clipping, and adds `padding` around that extent. Specify only
+`height` to derive the width, or only `width` to derive the height. Box, Frame,
+and stacks can hug the resulting size. With no dimensions or offers, the map fits
+within 720 × 400 px. An explicit `aspect` overrides the preferred outer ratio;
+two exact dimensions retain their allocated rectangle. Explicit `width` and
+`height` use ordinary Gum sizing. Padding defaults to `0`. `padding`, `border_width`, and
 `point_radius` use Gum lengths; `px()` makes the intended unit unambiguous.
 
 Nest core marks and annotations inside `GeoMap`. Numeric pairs are
@@ -192,9 +200,11 @@ as needed. `space="local"` opts marks out; tagged x/y lengths position annotatio
 in local space. The geographic source retains its spherical path rendering.
 
 For a point annotation outside the map subtree, `project_geo_point(source, view, width, height,
-[longitude, latitude])` returns local pixel coordinates or `null` if clipped.
+[longitude, latitude])` returns local pixel coordinates or `null` if hidden by
+the projection's spherical clipping. Bounds and viewport clips apply to the
+GeoMap subtree; external annotations need their own clipping.
 Pass the same projection, fit target, and padding to this helper as to `GeoMap`.
-The helper's `map_padding` value is a number of **pixels** because it does not
+The helper's `padding` value is a number of **pixels** because it does not
 run within Gum layout.
 
 ## Borders and large sources
@@ -203,8 +213,9 @@ run within Gum layout.
 color while leaving the area outside the projection transparent. It defaults to
 `none` and accepts the same color strings and theme paints as other backgrounds.
 The fill follows the map's projection, rotation, clipping, and fitted extent;
-it forms a circle for an orthographic globe. For regional maps, the sphere is
-cropped to the map rectangle. Albers USA uses its composite projection's clip
+it forms a circle for an orthographic globe. With bounds fitting, the sphere is
+cropped to the projected geographic box; all maps also clip to their allocated
+rectangle. Albers USA uses its composite projection's clip
 regions. This fills gaps and polygon holes in the supplied geography, so lakes
 appear only where the source leaves them unfilled. Use an outer `Box` background
 to give the surrounding rectangle a separate color.

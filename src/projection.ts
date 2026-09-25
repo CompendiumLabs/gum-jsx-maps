@@ -1,6 +1,6 @@
 import {
   geoAlbersUsa, geoEqualEarth, geoEquirectangular, geoGraticule, geoMercator,
-  geoNaturalEarth1, geoOrthographic, geoStream,
+  geoNaturalEarth1, geoOrthographic, geoPath, geoStream,
 } from 'd3-geo'
 import type { GeoProjection, GeoSphere } from 'd3-geo'
 import type { Feature, FeatureCollection, Geometry, Point, Polygon } from 'geojson'
@@ -9,13 +9,13 @@ import type { GeoSource, PreparedSource } from './source'
 
 type ProjectionName = 'equalEarth' | 'naturalEarth1' | 'albersUsa' | 'orthographic' | 'equirectangular' | 'mercator'
 type GeoBounds = readonly [west: number, south: number, east: number, north: number]
-type FitTarget = 'sphere' | 'data'
-  | Readonly<{ ids: readonly string[]; bounds?: never }>
-  | Readonly<{ bounds: GeoBounds; ids?: never }>
+type FitTarget = 'sphere' | 'data' | readonly string[]
 type GeoView = Readonly<{
   projection?: ProjectionName
   fit_to?: FitTarget
-  map_padding?: number // pixels in this helper; GeoMap also accepts Gum lengths
+  /** Geographic box to fit and clip to; takes precedence over fit_to. */
+  bounds?: GeoBounds
+  padding?: number // pixels in this helper; GeoMap also accepts Gum lengths
   /** Geographic location to pan to the viewport midpoint after fitting the scale. */
   center?: readonly [longitude: number, latitude: number]
   rotate?: readonly [lambda: number, phi: number, gamma?: number]
@@ -60,20 +60,15 @@ function bounds_object(bounds: GeoBounds): Polygon {
   return geoGraticule().extentMajor([[west, south], [right, north]]).precision(0.5).outline()
 }
 
-function fit_object(source: PreparedSource, target: FitTarget): GeoSphere | FeatureCollection | Polygon {
+function fit_object(source: PreparedSource, target: FitTarget): GeoSphere | FeatureCollection {
   if (target === 'sphere') return SPHERE
   if (target !== 'data') {
-    if (!target || typeof target !== 'object'
-      || (target.ids !== undefined) === (target.bounds !== undefined)) {
-      throw new TypeError('Fit target must be sphere, data, or an object with either ids or bounds')
-    }
-    if (target.bounds !== undefined) return bounds_object(target.bounds)
-    if (!Array.isArray(target.ids) || target.ids.some(id => typeof id !== 'string')) {
-      throw new TypeError('Fit target ids must be an array of strings')
+    if (!Array.isArray(target) || target.some(id => typeof id !== 'string')) {
+      throw new TypeError('Fit target must be sphere, data, or an array of string IDs')
     }
   }
   const selected = target === 'data' ? source.features
-    : target.ids!.map(id => {
+    : target.map(id => {
       const item = source.by_id.get(id)
       if (!item) throw new Error(`Fit target feature ${JSON.stringify(id)} was not found`)
       return item
@@ -84,13 +79,7 @@ function fit_object(source: PreparedSource, target: FitTarget): GeoSphere | Feat
   return { type: 'FeatureCollection', features }
 }
 
-function create_geo_projection(source: PreparedSource, view: GeoView, width: number, height: number): GeoProjection {
-  finite(width, 'Map width'); finite(height, 'Map height')
-  if (width <= 0 || height <= 0) throw new RangeError('Map width and height must be positive')
-  const padding = finite(view.map_padding ?? 8, 'Map padding')
-  if (padding < 0 || padding * 2 >= Math.min(width, height)) {
-    throw new RangeError('Map padding must leave a positive drawing area')
-  }
+function projection_target(source: PreparedSource, view: Omit<GeoView, 'padding'>) {
   const name = view.projection ?? 'naturalEarth1'
   const projection = projection_preset(name)
   if (name === 'albersUsa' && (view.center || view.rotate || view.clip_angle !== undefined)) {
@@ -114,11 +103,37 @@ function create_geo_projection(source: PreparedSource, view: GeoView, width: num
     if (finite(view.precision, 'precision') < 0) throw new RangeError('precision must be nonnegative')
     projection.precision(view.precision)
   }
+  if (view.bounds !== undefined) return { projection, geometry: bounds_object(view.bounds) }
   const target = view.fit_to ?? (name === 'albersUsa' ? 'data' : 'sphere')
   if (name === 'albersUsa' && target === 'sphere') {
     throw new TypeError('albersUsa cannot fit the whole sphere; use data, selected IDs, or bounds')
   }
-  projection.fitExtent([[padding, padding], [width - padding, height - padding]], fit_object(source, target))
+  return { projection, geometry: fit_object(source, target) }
+}
+
+// Measure at the same reference scale as D3's fitting pass. This includes
+// spherical clipping, rotation, curved edges, and Albers USA's inset regions.
+function geo_aspect(source: PreparedSource, view: Omit<GeoView, 'padding'>): number {
+  const { projection, geometry } = projection_target(source, view)
+  projection.scale(150).translate([0, 0])
+  const [[left, top], [right, bottom]] = geoPath(projection).bounds(geometry)
+  const width = right - left, height = bottom - top
+  if (![width, height].every(Number.isFinite) || (width <= 0 && height <= 0)) {
+    throw new RangeError('The fit target has no visible extent in this projection')
+  }
+  // A horizontal or vertical line can be fitted, but supplies no usable ratio.
+  return width > 0 && height > 0 ? width / height : 1.8
+}
+
+function create_geo_projection(source: PreparedSource, view: GeoView, width: number, height: number): GeoProjection {
+  finite(width, 'Map width'); finite(height, 'Map height')
+  if (width <= 0 || height <= 0) throw new RangeError('Map width and height must be positive')
+  const padding = finite(view.padding ?? 0, 'Map padding')
+  if (padding < 0 || padding * 2 >= Math.min(width, height)) {
+    throw new RangeError('Map padding must leave a positive drawing area')
+  }
+  const { projection, geometry } = projection_target(source, view)
+  projection.fitExtent([[padding, padding], [width - padding, height - padding]], geometry)
   if (!(projection.scale() > 0) || ![projection.scale(), ...projection.translate()].every(Number.isFinite)) {
     throw new RangeError('The fit target has no visible extent in this projection')
   }
@@ -156,5 +171,5 @@ function project_fitted_point(projection: GeoProjection,
   return result
 }
 
-export { create_geo_projection, project_geo_point, project_fitted_point }
+export { create_geo_projection, project_geo_point, project_fitted_point, bounds_object, geo_aspect }
 export type { ProjectionName, GeoBounds, FitTarget, GeoView }

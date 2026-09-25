@@ -15,10 +15,10 @@ test('map children share the fitted projection through resizing, centering, and 
   const pass = new LayoutPass()
   for (const view of [
     {}, { center: point }, { projection: 'orthographic', rotate: [-30, -20, 0] },
-    { projection: 'equirectangular', map_padding: 25 },
+    { projection: 'equirectangular', padding: 25 },
   ] satisfies GeoView[]) {
     const map = new GeoMap({ source, ...view,
-      map_padding: px(view.map_padding ?? 8), children: [marker, annotation] })
+      padding: view.padding === undefined ? undefined : px(view.padding), children: [marker, annotation] })
     for (const [width, height] of [[640, 400], [320, 500]]) {
       const fragment = pass.layout(map, make_request({ width: exact(width), height: exact(height) }))
       const projected = project_geo_point(prepared, view, width, height, point)!
