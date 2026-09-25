@@ -24,7 +24,7 @@ The atlas package license notices are included as
 [`world-atlas-LICENSE`](world-atlas-LICENSE) and
 [`us-atlas-LICENSE`](us-atlas-LICENSE). The synthetic polygon-with-hole and
 antimeridian fixtures are defined directly in
-[`geojson_edges.jsx`](../docs/examples/geojson_edges.jsx).
+[`geojson_edges.jsx` in the main docs gallery](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/gallery/code/geojson_edges.jsx).
 
 The source atlases are snapshots. Check their age, scale, and boundary viewpoint
 before using them for any current or sensitive boundary claim.

@@ -4,7 +4,8 @@ Static projected maps for Gum JSX. The package accepts GeoJSON or TopoJSON,
 projects geometry with `d3-geo`, and draws it through Gum's vector path system.
 It does not fetch data while rendering.
 
-For complete, offline figures, see the [runnable map examples](docs/README.md).
+For complete, offline figures, see the
+[Maps gallery in the main docs](https://github.com/CompendiumLabs/gum-jsx-docs#maps-gallery).
 
 ## Bundled geography
 
@@ -42,7 +43,7 @@ const result = render_element(new GeoMap({
 if (result.kind === 'svg') await Bun.write('world.svg', result.svg)
 ```
 
-The CLI exposes the map elements and accessors through `--plugin @gum-jsx/maps`.
+The CLI includes the map elements and accessors by default, alongside math.
 For example, save this as `world.jsx`:
 
 ```jsx
@@ -54,10 +55,10 @@ For example, save this as `world.jsx`:
 />
 ```
 
-Then run it from a project with `@gum-jsx/maps` installed:
+Then render it with the CLI:
 
 ```sh
-gum world.jsx --plugin @gum-jsx/maps -o world.svg
+gum world.jsx -o world.svg
 ```
 
 Gum `.jsx` files use the plugin's exports directly, without package imports.
