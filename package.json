@@ -1,0 +1,49 @@
+{
+  "name": "@gum-jsx/maps",
+  "description": "Static geographic maps for Gum JSX.",
+  "type": "module",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": "./src/index.ts",
+  "license": "MIT",
+  "scripts": {
+    "test": "bun test ./test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gum-jsx/core": "2.0.0-beta.1",
+    "@types/d3-geo": "^3.1.1",
+    "@types/geojson": "^7946.0.16",
+    "@types/topojson-client": "^3.1.5",
+    "@types/topojson-specification": "^1.0.5",
+    "d3-geo": "^3.1.1",
+    "d3-geo-projection": "^4.0.0",
+    "topojson-client": "^3.1.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^7"
+  },
+  "version": "2.0.0-beta.1",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CompendiumLabs/gum-jsx-maps.git"
+  },
+  "homepage": "https://github.com/CompendiumLabs/gum-jsx-maps#readme",
+  "bugs": {
+    "url": "https://github.com/CompendiumLabs/gum-jsx-maps/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "beta"
+  },
+  "engines": {
+    "bun": ">=1.4.2"
+  },
+  "files": [
+    "src",
+    "data",
+    "README.md",
+    "LICENSE"
+  ]
+}
