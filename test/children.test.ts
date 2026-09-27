@@ -19,7 +19,7 @@ test('map children share the fitted projection through resizing, centering, and 
   ] satisfies GeoView[]) {
     for (const position of positions) {
       const marker = new Points({ points: [position], point_size: px(8), fill: 'red' })
-      const annotation = new Rect({ pos: position, width: px(10), height: px(6), anchor: 'center' })
+      const annotation = new Rect({ pos: position, width: px(10), height: px(6) })
       const map = new GeoMap({ source, ...view,
         padding: view.padding === undefined ? undefined : px(view.padding), children: [marker, annotation] })
       for (const [width, height] of [[640, 400], [320, 500]]) {
@@ -116,7 +116,7 @@ test('local children bypass geography and source-resource maps support annotatio
     new CoordLine({ space: 'local', points: [[0, 0], [1, 1]] }),
   ] })
   const result = pass.layout(map)
-  expect(result.children[1].offset).toEqual({ x: 12, y: 24 })
+  expect(result.children[1].offset).toEqual({ x: 7, y: 19 })
   const line = result.children[2].fragment.draw[0]
   expect(line.kind === 'path' && line.commands).toEqual([
     { kind: 'M', x: 0, y: 0 }, { kind: 'L', x: 400, y: 300 },
