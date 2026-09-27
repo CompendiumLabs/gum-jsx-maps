@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test'
-import { Arrow, CoordLine, LayoutPass, Line, Points, Polyline, Rect, exact, make_request, px } from '@gum-jsx/core'
+import { Arrow, CoordLine, Evaluator, Fill, LayoutPass, Line, Points, Polyline, Rect, SymLine, exact, make_request, px } from '@gum-jsx/core'
+import type { Coordinate, CoordinatePosition } from '@gum-jsx/core'
 import { GeoMap, geojson, prepare_geo_source, project_geo_point } from '../src'
 import type { GeoView } from '../src'
 import type { Point } from 'geojson'
@@ -10,37 +11,42 @@ const prepared = prepare_geo_source(source)
 const point = [30, 20] as const
 
 test('map children share the fitted projection through resizing, centering, and rotation', () => {
-  const marker = new Points({ points: [point], point_size: px(8), fill: 'red' })
-  const annotation = new Rect({ x: point[0], y: point[1], width: px(10), height: px(6), anchor: 'center' })
   const pass = new LayoutPass()
+  const positions: CoordinatePosition[] = [point, { lon: point[0], lat: point[1] }, { x: point[0], y: point[1] }]
   for (const view of [
     {}, { center: point }, { projection: 'orthographic', rotate: [-30, -20, 0] },
-    { projection: 'equirectangular', padding: 25 },
+    { projection: 'equirectangular', padding: 25 }, { bounds: [0, 0, 60, 40], padding: 10 },
   ] satisfies GeoView[]) {
-    const map = new GeoMap({ source, ...view,
-      padding: view.padding === undefined ? undefined : px(view.padding), children: [marker, annotation] })
-    for (const [width, height] of [[640, 400], [320, 500]]) {
-      const fragment = pass.layout(map, make_request({ width: exact(width), height: exact(height) }))
-      const projected = project_geo_point(prepared, view, width, height, point)!
-      const dot = fragment.children[0].fragment.children[0]
-      expect(dot.offset.x + 4).toBeCloseTo(projected[0], 8)
-      expect(dot.offset.y + 4).toBeCloseTo(projected[1], 8)
-      expect(dot.fragment.size).toEqual({ width: 8, height: 8 })
-      const label = fragment.children[1]
-      expect(label.offset.x + 5).toBeCloseTo(projected[0], 8)
-      expect(label.offset.y + 3).toBeCloseTo(projected[1], 8)
-      expect(fragment.clip).toEqual({ x: 0, y: 0, width, height })
+    for (const position of positions) {
+      const marker = new Points({ points: [position], point_size: px(8), fill: 'red' })
+      const annotation = new Rect({ pos: position, width: px(10), height: px(6), anchor: 'center' })
+      const map = new GeoMap({ source, ...view,
+        padding: view.padding === undefined ? undefined : px(view.padding), children: [marker, annotation] })
+      for (const [width, height] of [[640, 400], [320, 500]]) {
+        const request = make_request({ width: exact(width), height: exact(height) })
+        const fragment = pass.layout(map, request)
+        expect(pass.layout(map, request)).toBe(fragment)
+        const projected = project_geo_point(prepared, view, width, height, point)!
+        const dot = fragment.children[0].fragment.children[0]
+        expect(dot.offset.x + 4).toBeCloseTo(projected[0], 8)
+        expect(dot.offset.y + 4).toBeCloseTo(projected[1], 8)
+        expect(dot.fragment.size).toEqual({ width: 8, height: 8 })
+        const label = fragment.children[1]
+        expect(label.offset.x + 5).toBeCloseTo(projected[0], 8)
+        expect(label.offset.y + 3).toBeCloseTo(projected[1], 8)
+        expect(fragment.clip).toEqual({ x: 0, y: 0, width, height })
+      }
     }
   }
 })
 
 test('globe visibility hides back-side annotations and breaks ordinary paths', () => {
-  const points = [[0, 0], [20, 10], [180, 0], [-20, -10], [-10, 0]] as const
+  const points = [[0, 0], [20, 10], [180, 0], [-20, -10], [-10, 0]].map(([lon, lat]) => ({ lon, lat }))
   const pass = new LayoutPass()
   const result = pass.layout(new GeoMap({ source, projection: 'orthographic', width: px(400), height: px(400),
     children: [new Points({ points }), new CoordLine({ points }),
       new Arrow({ points, stroke: 'red', start_head: true }),
-      new Rect({ x: 180, y: 0, width: px(10), height: px(10) })] }))
+      new Rect({ pos: { lon: 180, lat: 0 }, width: px(10), height: px(10) })] }))
   expect(result.children[0].fragment.children.length).toBe(4)
   const line = result.children[1].fragment.draw[0]
   expect(line.kind === 'path' && line.commands.map(c => c.kind)).toEqual(['M', 'L', 'M', 'L'])
@@ -48,11 +54,65 @@ test('globe visibility hides back-side annotations and breaks ordinary paths', (
   expect(result.children[3].fragment.draw).toEqual([])
 })
 
+test('named routes, samples, and Fill boundaries match tuple geometry', () => {
+  const named = (lon: number, lat: number) => ({ lon, lat })
+  const tuple = (lon: number, lat: number) => [lon, lat] as const
+  const pass = new LayoutPass()
+  const map = (position: typeof named | typeof tuple) => new GeoMap({ source,
+    projection: 'orthographic', rotate: [-15, -10], padding: px(15), children: [
+      new Line({ from: position(0, 0), to: position(20, 10), space: 'data' }),
+      new Polyline({ points: [position(0, 0), position(20, 10), position(180, 0), position(0, 10)], space: 'data' }),
+      new Arrow({ from: position(0, 0), to: position(20, 10) }),
+      new SymLine({ tvals: [0, 1, 2], f: t => position(t * 10, t * 5) }),
+      new Fill({ points: [position(0, 10), position(20, 10)], boundary: [position(0, 0), position(20, 0)] }),
+    ] })
+  for (const [width, height] of [[640, 400], [320, 500]]) {
+    const request = make_request({ width: exact(width), height: exact(height) })
+    expect(pass.layout(map(named), request)).toEqual(pass.layout(map(tuple), request))
+  }
+})
+
+test('map coordinates require complete unmixed geographic or Cartesian names', () => {
+  const pass = new LayoutPass()
+  for (const position of [
+    { lon: 30 }, { lat: 20 }, { x: 30 }, { y: 20 }, { longitude: 30, latitude: 20 },
+    { lon: 30, y: 20 }, { x: 30, lat: 20 }, { lon: 30, lat: 20, x: 30 },
+    { lon: 30, lat: 20, x: 30, y: 20 },
+  ] as Coordinate[]) {
+    const mixed = ('lon' in position || 'lat' in position) && ('x' in position || 'y' in position)
+    for (const child of [new Points({ points: [position] }), new Rect({ pos: position, width: px(8) })]) {
+      expect(() => pass.layout(new GeoMap({ source, children: child })))
+        .toThrow(mixed ? 'cannot mix lon/lat with x/y' : 'need both lon and lat, or both x and y')
+    }
+  }
+})
+
+test('JSX records and spreads snapshot named positions without changing the geographic source', () => {
+  const evaluator = new Evaluator({ scope: { GeoMap, source } })
+  const element = evaluator.evaluate(`
+    const position = {lon: 30, lat: 20}
+    const placement = {pos: position, anchor: 'center', width: px(10), height: px(6)}
+    const result = <GeoMap source={source}>
+      <Rect {...placement} />
+      <Points points={[position]} point-size={({lat}) => px(lat / 5)} />
+    </GeoMap>
+    position.lon = 90
+    return result
+  `)
+  const expected = new GeoMap({ source, children: [
+    new Rect({ pos: point, anchor: 'center', width: px(10), height: px(6) }),
+    new Points({ points: [point], point_size: px(4) }),
+  ] })
+  const pass = new LayoutPass()
+  expect(pass.layout(element)).toEqual(pass.layout(expected))
+  expect(geometry.coordinates).toEqual([30, 20])
+})
+
 test('local children bypass geography and source-resource maps support annotations', () => {
   const pass = new LayoutPass({ geography: { value: prepared, version: 1 } })
   const map = new GeoMap({ source_resource: 'geography', width: px(400), height: px(300), children: [
     new Points({ points: [point], point_size: px(8) }),
-    new Rect({ x: px(12), y: px(24), width: px(10), height: px(10) }),
+    new Rect({ pos: { x: px(12), y: px(24) }, width: px(10), height: px(10) }),
     new CoordLine({ space: 'local', points: [[0, 0], [1, 1]] }),
   ] })
   const result = pass.layout(map)

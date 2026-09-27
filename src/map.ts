@@ -3,7 +3,7 @@ import {
   make_fragment, make_insets, make_measure, make_rect, make_request, make_size, normalize_length, px,
   resolve_length, resolve_paint, resolve_style, shape_size, theme_color,
 } from '@gum-jsx/core'
-import type { AxisSizing, ElementProps, LayoutQuery, Length, Size, StyleSpec } from '@gum-jsx/core'
+import type { AxisSizing, Coordinate, ElementProps, LayoutQuery, Length, Size, StyleSpec } from '@gum-jsx/core'
 import { projected_commands } from './path'
 import { bounds_object, create_geo_projection, geo_aspect, project_fitted_point } from './projection'
 import type { GeoView } from './projection'
@@ -109,6 +109,19 @@ function map_source(props: GeoMapData, query: LayoutQuery): PreparedSource {
   })
 }
 
+// Core expands tuple shorthand to x/y before projection. Geographic names are
+// an alternative for children; D3 and GeoJSON keep their longitude/latitude pairs.
+function child_lonlat(point: Coordinate): [number, number] {
+  const geographic = Object.hasOwn(point, 'lon') || Object.hasOwn(point, 'lat')
+  const cartesian = Object.hasOwn(point, 'x') || Object.hasOwn(point, 'y')
+  if (geographic && cartesian) throw new TypeError('GeoMap coordinates cannot mix lon/lat with x/y')
+  const [lon, lat] = geographic ? ['lon', 'lat'] : ['x', 'y']
+  if (!Object.hasOwn(point, lon) || !Object.hasOwn(point, lat)) {
+    throw new TypeError('GeoMap coordinates need both lon and lat, or both x and y ([longitude, latitude])')
+  }
+  return [point[lon], point[lat]]
+}
+
 class GeoMap extends Element<GeoMapData, GeoMapProps> {
   static normalize = map_data
   static data_bounds() { return null; }
@@ -201,7 +214,10 @@ class GeoMap extends Element<GeoMapData, GeoMapProps> {
     const clip_path = bounds === undefined ? undefined : projected_commands(projection, bounds_object(bounds))
     const children = graph_children(element_children(props.children), query, size, {
       xlim: [0, size.width], ylim: [0, size.height], flip_x: false, flip_y: false,
-      projection: new Projection(point => project_fitted_point(projection, point)),
+      projection: new Projection(coordinates => {
+        const point = project_fitted_point(projection, child_lonlat(coordinates))
+        return point === null ? null : { x: point[0], y: point[1] }
+      }),
     })
     return make_fragment({ size, draw, children, content: area, clip: area,
       ...(clip_path === undefined ? {} : { clip_path }) })

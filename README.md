@@ -180,24 +180,28 @@ two exact dimensions retain their allocated rectangle. Explicit `width` and
 `height` use ordinary Gum sizing. Padding defaults to `0`. `padding`, `border_width`, and
 `point_radius` use Gum lengths; `px()` makes the intended unit unambiguous.
 
-Nest core marks and annotations inside `GeoMap`. Numeric pairs are
-`[longitude, latitude]` in degrees; direct-child `x` and `y` anchors share the
-map's projection. `Points`, sampled `Arrow` routes, and labels follow its fit,
+Nest core marks and annotations inside `GeoMap`. Use `{lon, lat}` records in
+degrees for mark coordinates and direct-child `pos` values. The aliases
+`[longitude, latitude]` and `{x: longitude, y: latitude}` also work. Both
+components are required; mixing `lon`/`lat` with `x`/`y` in one record is an error.
+`Points`, sampled `Arrow` routes, and labels follow the map's fit,
 center, rotation, padding, and resizing. Hidden points are omitted and sampled
 paths break at them. Child marker sizes, arrowheads, and text remain layout
 lengths. Set route strokes explicitly, since children inherit map styles.
 
 ```jsx
 <GeoMap source={world_countries()} background="lightblue">
-  <Points points={[[2.35, 48.86]]} point-size={px(8)} fill="red" />
-  <Text x={2.35} y={48.86} anchor={['start', 'end']}>Paris</Text>
+  <Points points={[{lon: 2.35, lat: 48.86}]} point-size={px(8)} fill="red" />
+  <Text pos={{lon: 2.35, lat: 48.86}} anchor={['start', 'end']}>Paris</Text>
 </GeoMap>
 ```
 
-Core projections map only supplied point pairs; they do not resample paths or
+Core projections map only supplied points; they do not resample paths or
 split antimeridian crossings. Supply sampled routes and separate marks at seams
-as needed. `space="local"` opts marks out; tagged x/y lengths position annotations
-in local space. The geographic source retains its spherical path rendering.
+as needed. `space="local"` opts marks out; a Cartesian `pos` such as
+`[px(12), px(24)]` positions annotations in local space. Local lengths require
+`x` and `y`; geographic components must be numeric. GeoJSON, TopoJSON, `center`,
+and the geographic projection helpers retain their established array formats.
 
 For a point annotation outside the map subtree, `project_geo_point(source, view, width, height,
 [longitude, latitude])` returns local pixel coordinates or `null` if hidden by
