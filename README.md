@@ -262,3 +262,10 @@ are another source. Prepare the files outside rendering and commit or pin the
 result so a rerun uses the same geometry. Use topology-preserving simplification
 when producing a compact TopoJSON file; projection precision is a separate
 control for the curves generated at render time.
+
+## Performance
+
+Run `bun run perf` in this package to measure bundled data, source preparation,
+projections, clipping, and SVG output. Use `--list`, `--filter <regex>`, `--smoke`,
+or `--json` to narrow or save a run.
+See [performance workloads and methodology](test/perf/README.md).
