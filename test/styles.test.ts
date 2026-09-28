@@ -1,3 +1,4 @@
+import { FREEZE_ENABLED } from '@gum-jsx/core'
 import { expect, test } from 'bun:test'
 import { LayoutPass, THEMES, em, exact, make_request, px } from '@gum-jsx/core'
 import type { FeatureCollection, Point } from 'geojson'
@@ -43,7 +44,7 @@ test('snapshots each callback result once and does not rerun callbacks on resizi
   } })
   expect(calls).toEqual(['001', '002', '003'])
   reused.fill = 'purple'
-  expect(Object.isFrozen(map.props.styles!['001'])).toBe(true)
+  expect(Object.isFrozen(map.props.styles!['001'])).toBe(FREEZE_ENABLED)
   const pass = new LayoutPass()
   for (const width of [320, 640]) {
     const result = pass.layout(map, make_request({ width: exact(width) }))
