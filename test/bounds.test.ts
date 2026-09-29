@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 import { LayoutPass, Line, Points, exact, make_request, px, render_svg } from '@gum-jsx/core'
-import { rasterize_pixels } from '@gum-jsx/png'
+import { render_pixels } from '@gum-jsx/png'
 import { geojson, prepare_geo_source, create_geo_projection, project_geo_point, GeoMap, world_countries } from '../src'
 import type { FitTarget, GeoBounds, ProjectionName } from '../src'
 import type { FeatureCollection, Polygon } from 'geojson'
@@ -141,7 +141,7 @@ test('a narrow bounds view clips water, land, borders, and crossing child lines'
       children: new Line({ space: 'data', from: [-10, 50], to: [30, 50],
         stroke: 'magenta', stroke_width: px(6) }),
     }))
-    const pixels = rasterize_pixels(render_svg(fragment))
+    const pixels = render_pixels(fragment)
     const pixel = (x: number, y: number) => [...pixels.data.slice((y * pixels.width + x) * 4, (y * pixels.width + x + 1) * 4)]
     expect(pixel(300, 60)).toEqual(source === land ? [0, 128, 0, 255] : [0, 0, 255, 255])
     expect(pixel(300, 120)).toEqual([255, 0, 255, 255])
@@ -166,7 +166,7 @@ test('bounds clips follow curved edges and both sides of an antimeridian crossin
   for (const { inside, outside, ...view } of cases) {
     const fragment = new LayoutPass().layout(new GeoMap({ source, ...view,
       width: px(640), height: px(400), background: 'blue', padding: px(20) }))
-    const pixels = rasterize_pixels(render_svg(fragment))
+    const pixels = render_pixels(fragment)
     const projection = create_geo_projection(prepared, { ...view, padding: 20 }, 640, 400)
     for (const [points, alpha] of [[inside, 255], [outside, 0]] as const) {
       for (const [lon, lat] of points) {
