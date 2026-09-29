@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@gum-jsx/core": "2.0.0-beta.2",
+    "@gum-jsx/core": "2.0.0-beta.3",
     "@types/d3-geo": "^3.1.1",
     "@types/geojson": "^7946.0.16",
     "@types/topojson-client": "^3.1.5",
@@ -23,11 +23,11 @@
   },
   "devDependencies": {
     "mitata": "1.0.34",
-    "@gum-jsx/png": "2.0.0-beta.2",
+    "@gum-jsx/png": "2.0.0-beta.3",
     "@types/bun": "latest",
     "typescript": "^7"
   },
-  "version": "2.0.0-beta.2",
+  "version": "2.0.0-beta.3",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/CompendiumLabs/gum-jsx-maps.git"
