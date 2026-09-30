@@ -1,6 +1,6 @@
 {
   "name": "@gum-jsx/maps",
-  "description": "Static geographic maps for Gum JSX.",
+  "description": "Static geographic maps for Gum.",
   "type": "module",
   "module": "src/index.ts",
   "types": "src/index.ts",

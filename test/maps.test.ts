@@ -229,7 +229,7 @@ describe('projection and Gum integration', () => {
     expect(result.svg).not.toContain('NaN')
   })
 
-  test('works in Gum JSX with host-provided scope and dashed attributes', () => {
+  test('works in Gum with host-provided scope and dashed attributes', () => {
     const world = topojson(topology, 'countries')
     const element = evaluate('<GeoMap source={world} width={px(320)} height={px(180)} fit-to="data" border-mode="interior" />',
       { scope: { GeoMap, world } })

@@ -1,6 +1,6 @@
 # @gum-jsx/maps
 
-Static projected maps for Gum JSX. The package accepts GeoJSON or TopoJSON,
+Static projected maps for Gum. The package accepts GeoJSON or TopoJSON,
 projects geometry with `d3-geo`, and draws it through Gum's vector path system.
 It does not fetch data while rendering.
 
