@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { Arrow, Polyline, Evaluator, Fill, LayoutPass, Line, Points, Rect, SymLine, exact, make_request, px } from '@gum-jsx/core'
+import { Arrow, Polyline, Polygon, Evaluator, Fill, LayoutPass, Line, Points, Rect, SymLine, exact, make_request, px } from '@gum-jsx/core'
 import type { Coordinate, CoordinatePosition } from '@gum-jsx/core'
 import { GeoMap, geojson, prepare_geo_source, project_geo_point } from '../src'
 import type { GeoView } from '../src'
@@ -60,7 +60,7 @@ test('named routes, samples, and Fill boundaries match tuple geometry', () => {
   const pass = new LayoutPass()
   const map = (position: typeof named | typeof tuple) => new GeoMap({ source,
     projection: 'orthographic', rotate: [-15, -10], padding: px(15), children: [
-      new Line({ from: position(0, 0), to: position(20, 10), space: 'data' }),
+      new Line({ from: position(0, 0), to: position(20, 10) }),
       new Polyline({ points: [position(0, 0), position(20, 10), position(180, 0), position(0, 10)], space: 'data' }),
       new Arrow({ from: position(0, 0), to: position(20, 10) }),
       new SymLine({ tvals: [0, 1, 2], f: t => position(t * 10, t * 5) }),
@@ -125,16 +125,18 @@ test('local children bypass geography and source-resource maps support annotatio
   expect(result.children[0].fragment.children[0].offset.x + 4).toBeCloseTo(projected[0], 8)
 })
 
-test('ambient Polyline and explicit data geometry share map projection and visibility', () => {
+test('ambient lines and polygons share map projection and visibility', () => {
   const points = [[0, 0], [20, 10], [180, 0], [-20, -10], [-10, 0]] as const
   const result = new LayoutPass().layout(new GeoMap({ source, projection: 'orthographic',
     width: px(400), height: px(400), children: [
       new Polyline({ points }), new Polyline({ points, space: 'data' }),
-      new Line({ from: points[0], to: points[1], space: 'data' }),
-      new Line({ from: points[0], to: points[2], space: 'data' }),
+      new Line({ from: points[0], to: points[1] }),
+      new Line({ from: points[0], to: points[2] }),
+      new Polygon({ points }), new Polyline({ points, closed: true }),
     ] }))
   const draws = result.children.map(child => child.fragment.draw[0])
   expect(draws[1]).toEqual(draws[0])
+  expect(draws[4]).toEqual(draws[5])
   const expected = points.slice(0, 2).map((point, index) => {
     const [x, y] = project_geo_point(prepared, { projection: 'orthographic' }, 400, 400, point)!
     return { kind: index ? 'L' : 'M', x, y } as const
