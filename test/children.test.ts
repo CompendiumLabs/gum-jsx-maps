@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { Arrow, CoordLine, Evaluator, Fill, LayoutPass, Line, Points, Polyline, Rect, SymLine, exact, make_request, px } from '@gum-jsx/core'
+import { Arrow, Polyline, Evaluator, Fill, LayoutPass, Line, Points, Rect, SymLine, exact, make_request, px } from '@gum-jsx/core'
 import type { Coordinate, CoordinatePosition } from '@gum-jsx/core'
 import { GeoMap, geojson, prepare_geo_source, project_geo_point } from '../src'
 import type { GeoView } from '../src'
@@ -44,7 +44,7 @@ test('globe visibility hides back-side annotations and breaks ordinary paths', (
   const points = [[0, 0], [20, 10], [180, 0], [-20, -10], [-10, 0]].map(([lon, lat]) => ({ lon, lat }))
   const pass = new LayoutPass()
   const result = pass.layout(new GeoMap({ source, projection: 'orthographic', width: px(400), height: px(400),
-    children: [new Points({ points }), new CoordLine({ points }),
+    children: [new Points({ points }), new Polyline({ points }),
       new Arrow({ points, stroke: 'red', start_head: true }),
       new Rect({ pos: { lon: 180, lat: 0 }, width: px(10), height: px(10) })] }))
   expect(result.children[0].fragment.children.length).toBe(4)
@@ -113,7 +113,7 @@ test('local children bypass geography and source-resource maps support annotatio
   const map = new GeoMap({ source_resource: 'geography', width: px(400), height: px(300), children: [
     new Points({ points: [point], point_size: px(8) }),
     new Rect({ pos: { x: px(12), y: px(24) }, width: px(10), height: px(10) }),
-    new CoordLine({ space: 'local', points: [[0, 0], [1, 1]] }),
+    new Polyline({ space: 'local', points: [[0, 0], [1, 1]] }),
   ] })
   const result = pass.layout(map)
   expect(result.children[1].offset).toEqual({ x: 7, y: 19 })
@@ -125,11 +125,11 @@ test('local children bypass geography and source-resource maps support annotatio
   expect(result.children[0].fragment.children[0].offset.x + 4).toBeCloseTo(projected[0], 8)
 })
 
-test('Line and Polyline opt into the same map projection and visibility as marks', () => {
+test('ambient Polyline and explicit data geometry share map projection and visibility', () => {
   const points = [[0, 0], [20, 10], [180, 0], [-20, -10], [-10, 0]] as const
   const result = new LayoutPass().layout(new GeoMap({ source, projection: 'orthographic',
     width: px(400), height: px(400), children: [
-      new CoordLine({ points }), new Polyline({ points, space: 'data' }),
+      new Polyline({ points }), new Polyline({ points, space: 'data' }),
       new Line({ from: points[0], to: points[1], space: 'data' }),
       new Line({ from: points[0], to: points[2], space: 'data' }),
     ] }))
