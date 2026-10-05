@@ -1,5 +1,7 @@
 # @gum-jsx/maps
 
+[Gum](https://github.com/CompendiumLabs/gum-jsx) — installation, quickstart, and user documentation.
+
 Static projected maps for Gum. The package accepts GeoJSON or TopoJSON,
 projects geometry with `d3-geo`, and draws it through Gum's vector path system.
 It does not fetch data while rendering.
