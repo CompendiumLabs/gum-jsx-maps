@@ -16,7 +16,7 @@ test('callbacks and dictionaries resolve the same feature paints, lengths, and i
   const styles: GeoStyleMap = {
     '001': { fill: 'red', opacity: 0.4, point_radius: em(0.25),
       stroke: 'black', stroke_width: em(0.1), stroke_dasharray: [px(2), px(1)] },
-    '003': { fill: 'theme:area' },
+    '003': { fill: 'theme:accent' },
   }
   const props = { source, width: px(400), height: px(240), font_size: px(20),
     theme: 'dark' as const, fill: 'blue', opacity: 0.8, border_mode: 'none' as const }
@@ -25,7 +25,7 @@ test('callbacks and dictionaries resolve the same feature paints, lengths, and i
   const callback = pass.layout(new GeoMap({ ...props, styles: id => styles[id] }))
   expect(callback.draw).toEqual(dictionary.draw)
   expect(dictionary.draw).toHaveLength(4)
-  expect(dictionary.draw.map(item => item.fill)).toEqual(['red', 'blue', THEMES.dark.area, 'none'])
+  expect(dictionary.draw.map(item => item.fill)).toEqual(['red', 'blue', THEMES.dark.accent, 'none'])
   expect(dictionary.draw.map(item => item.opacity)).toEqual([0.4, 0.8, 0.8, 0.4])
   expect(dictionary.draw[3]).toMatchObject({ stroke: 'black', stroke_width: 2, stroke_dasharray: [2, 1] })
   const first = dictionary.draw[0], second = dictionary.draw[1]

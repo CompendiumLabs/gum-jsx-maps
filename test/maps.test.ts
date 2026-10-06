@@ -141,10 +141,10 @@ describe('projected backgrounds', () => {
     const plain = pass.layout(new GeoMap(props))
     expect(pass.layout(new GeoMap({ ...props, background: 'none' })).draw).toEqual(plain.draw)
     const themed = pass.layout(new GeoMap({
-      ...props, theme: 'dark', background: 'theme:area', opacity: 0.4,
+      ...props, theme: 'dark', background: 'theme:accent', opacity: 0.4,
     }))
     expect(themed.draw).toHaveLength(plain.draw.length + 1)
-    expect(themed.draw[0]).toMatchObject({ fill: THEMES.dark.area, opacity: 0.4, stroke_width: 0 })
+    expect(themed.draw[0]).toMatchObject({ fill: THEMES.dark.accent, opacity: 0.4, stroke_width: 0 })
   })
 
   for (const projection of ['naturalEarth1', 'equalEarth', 'orthographic', 'equirectangular', 'mercator', 'albersUsa'] as const) {
