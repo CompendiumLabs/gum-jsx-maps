@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { LayoutPass, Svg, THEMES, evaluate, px, render_element } from '@gum-jsx/core'
+import { LayoutPass, Page, THEMES, evaluate, px, render_element } from '@gum-jsx/core'
 import { geoArea } from 'd3-geo'
 import type { FeatureCollection, MultiPolygon } from 'geojson'
 import type { Topology } from 'topojson-specification'
@@ -222,7 +222,7 @@ describe('projection and Gum integration', () => {
     const pass = new LayoutPass({ world: { value: prepare_geo_source(geojson(countries)), version: 1 } })
     const map = new GeoMap({ source_resource: 'world', width: px(320), height: px(180),
       fit_to: 'data' })
-    const result = render_element(new Svg({ width: px(320), height: px(180), children: map }), { pass })
+    const result = render_element(new Page({ width: px(320), height: px(180), children: map }), { pass })
     expect(result.kind).toBe('svg')
     if (result.kind !== 'svg') return
     expect(result.size).toEqual({ width: 320, height: 180 })
